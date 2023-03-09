@@ -1,0 +1,83 @@
+options {  static = true;  IGNORE_CASE = true;  LOOKAHEAD = 2;}PARSER_BEGIN(php)import Nodes.*;
+public class php {  public static void main(String args []) throws ParseException {    php parser = new php(System.in);	TreeNode n = parser.Start();	n.execute();
+  }}PARSER_END(php)SKIP : {  " "| "\r"| "\t"| "\n"| < COMMENT : "/*" (< STRING >)* "*/" >}TOKEN :{  < PLUS : "+" >| < MINUS : "-" >| < MULTIPLY : "*" >| < DIVIDE : "/" >| < EQ : "=" >| < INC : "++" >| < DEC : "--" >| < CAL : "!="|"<="|">="|"=="|"<"|">" >| < ANDOR : "&&" | "||" >}TOKEN :{  < VS : "$" >| < START: "<?php" >| < END : "?>" >| < SEMICO : ";" >| < OPENB : "(" >| < CLOSEB : ")" >| < OPENZ : "{" >| < CLOSEZ : "}" >| < Q : "'" >| < D : ":" >}TOKEN :{  < #ONENINE : ["1"-"9"] >| < #ZERO : "0" >| < #DIGIT : < ONENINE >|< ZERO > >| < #CHAR : ["a"-"z","A"-"Z"] >| < READLINE : "readline" >| < SWITCH : "switch" >| < CASE : "case" >| < DEF : "default" >| < IF : "if" >| < ELSE : "else" >| < ELSEIF : "elseif" >| < WHILE : "while" >| < DO : "do" >| < FOR : "for" >| < PRINT : "echo" >| < RETURN : "return" >| < BREAK : "break" >| < BOOL : "true" | "false" >| < STRING : < CHAR > (< CHAR > | < DIGIT >)* >| < INT : < ZERO > | ((< MINUS >)? < ONENINE > (< DIGIT >)*) >| < VAR : < VS >< STRING > >}BlockNode Start():{  BlockNode bn=new BlockNode();  StmtNode tn;
+}
+{
+  < START > (tn=Stmt() { bn.addChild(tn); })+ < END >  { return bn; }
+}
+StringNode String2():{  Token t;  StringNode sn;}{  < Q > (t=< STRING > { sn = new StringNode(t.image); })+ < Q >  { return sn; }}AssiNode VarAssi():{  Token t1, t2=null, t3=null;  AssiNode an= new AssiNode();  StringNode sn1, sn2, sn3, sn4=null;  ConstNode cn;}{    t1=< VAR > (< EQ > (sn4=String2() | t2=< BOOL > | t3=< INT > | t2=< VAR >))? < SEMICO >  {    sn1= new StringNode(t1.image);    an.addChild(sn1);    if(sn4!=null) {   	 	an.addChild(sn4);    }    if(t2!=null) {     	sn2= new StringNode(t2.image);   	 	an.addChild(sn2);    }    if(t3!=null) {     	cn= new ConstNode(t3.image);   	 	an.addChild(cn);    }    return an;  }}
+
+ConcatNode concat():
+{  ConcatNode con = new ConcatNode();  StringNode sn=null, sn1, sn2;
+  Token t1=null, t2=null;  ConstNode cn;
+}
+{
+  (    < PLUS >(sn=String2() | t1=< VAR > | t2=< INT >)	{	  if(sn!=null) {   	 	con.addChild(sn);      }      if(t1!=null) {      	sn1= new StringNode(t1.image);    	con.addChild(sn1);      }      if(t2!=null) {     	cn= new ConstNode(t2.image);    	con.addChild(cn);      }    }  )*
+  { return con; }
+}
+
+OutputNode Output():
+{
+  OutputNode op = new OutputNode();
+  Token t1=null, t2=null;
+  StringNode sn=null,sn1;
+  ConstNode cn;
+  ConcatNode con;
+}
+{
+  < PRINT > (
+    		  (sn=String2() con=concat())
+  			| (t1=< VAR > con=concat())
+  			| (t2=< INT > con=concat())
+  			) < SEMICO >
+  {
+    if(sn!=null) {
+   	 	op.addChild(sn);
+    }
+    if(t1!=null) { 
+    	sn1= new StringNode(t1.image);
+   	 	op.addChild(sn1);
+    }
+    if(t2!=null) { 
+    	cn= new ConstNode(t2.image);
+   	 	op.addChild(cn);
+    }
+    op.addChild(con);
+    return op;
+  }
+}
+
+
+IDNode IncDec():{  Token t1,t2;  StringNode sn1, sn2;  IDNode idn = new IDNode();}
+{
+  t1=< VAR > (t2=< INC > | t2=< DEC >)  {    sn1=new StringNode(t1.image);    idn.addChild(sn1);    sn2=new StringNode(t2.image);    idn.addChild(sn2);    return idn;
+  }
+}
+CondNode cond():{  CondNode coon=new CondNode();  Token t1, t2, t3=null, t4=null;  StringNode sn1, sn2, sn3;  ConstNode cn;}
+{
+  t1=< VAR > t2=< CAL > (t3=< VAR > | t4=< INT > | t3=< BOOL >)  {    sn1=new StringNode(t1.image);    coon.addChild(sn1);    sn2=new StringNode(t2.image);    coon.addChild(sn2);    if(t3!=null) {	  sn3=new StringNode(t3.image); 	  coon.addChild(sn3);    }    if(t4!=null){      cn=new ConstNode(t4.image);	  coon.addChild(cn);    }	return coon;  }
+}
+
+ConditionNode condition():{  ConditionNode cn = new ConditionNode();  CondNode coon=null, coon2=null, cooon=null;  Token t=null;  StringNode sn;}
+{
+  (    cooon=cond() | (< OPENB > coon=cond() < CLOSEB > (t=< ANDOR > < OPENB > coon2=cond() < CLOSEB >)+))  {	if(cooon!=null) {	  cn.addChild(cooon);	}	if(coon!=null) {	  cn.addChild(coon);	}	if(t!=null) {	  sn=new StringNode(t.image);	  cn.addChild(sn);	}	if(coon2!=null) {	  cn.addChild(coon2);	}	return cn;  }
+}StmtNode Stmt():{  StmtNode sn=new StmtNode();  TreeNode tn;}
+{  ( tn=IfStmt()  | tn=ForStmt()  | tn=WhileStmt()  | tn=SwitchStmt()  | tn=DoWhileStmt()  | tn=VarAssi()  | tn=Output()  | (tn=IncDec() < SEMICO >))  {    sn.addChild(tn);    return sn;
+  }
+}
+IfNode IfStmt():{  IfNode ifn= new IfNode();  ElseifNode ein=null;  ElseNode en=null;  ConditionNode fcn;  StmtNode sn;}{  < IF >< OPENB >fcn= condition() { ifn.addChild(fcn); }  < CLOSEB >< OPENZ > (sn=Stmt() { ifn.addChild(sn); })+ < CLOSEZ >  (ein=ElseifStmt() { ifn.addChild(ein); })* (ElseStmt() { ifn.addChild(en); })?  { return ifn; }}ElseifNode ElseifStmt():{  ElseifNode ein = new ElseifNode();  ConditionNode fcn;  StmtNode sn;}{  < ELSEIF > <OPENB> fcn=condition() { ein.addChild(fcn); } < CLOSEB >  < OPENZ> (sn=Stmt() { ein.addChild(sn); })+ < CLOSEZ>  { return ein; }}ElseNode ElseStmt():{  ElseNode en = new ElseNode();  StmtNode sn;}{  < ELSE >< OPENZ > (sn=Stmt() { en.addChild(sn); })+ < CLOSEZ >  { return en; }}
+ForNode ForStmt():{  ForNode fn=new ForNode();  AssiNode an;  CondNode cn;  IDNode idn;  StmtNode tn;}
+{
+  < FOR >< OPENB > an=VarAssi() cn=cond() < SEMICO > idn=IncDec() < CLOSEB > { fn.addChild(an); fn.addChild(cn); fn.addChild(idn); }
+  < OPENZ > (tn=Stmt() { fn.addChild(tn); })+ < CLOSEZ >  { return fn; }
+}
+WhileNode WhileStmt():{  WhileNode wn=new WhileNode();  ConditionNode con;  StmtNode tn;}
+{
+  < WHILE >< OPENB > con=condition() { wn.addChild(con); } < CLOSEB >
+  < OPENZ > (tn=Stmt() { wn.addChild(tn); })+ < CLOSEZ >  { return wn; }
+}
+DowhileNode DoWhileStmt():{  DowhileNode wn=new DowhileNode();  ConditionNode con;  StmtNode tn;}
+{
+  < DO >< OPENZ > (tn=Stmt() { wn.addChild(tn); })+ < CLOSEZ >
+  < WHILE >< OPENB > con=condition() < CLOSEB >< SEMICO >  {    wn.addChild(con);    return wn;  }
+}SwitchNode SwitchStmt():{  SwitchNode sw = new SwitchNode();  Token t=null;  StringNode s;  CaseNode  c;  DefaultNode d; }{  < SWITCH > < OPENB >t=< VAR > { s=new StringNode(t.image); sw.addChild(s); }< CLOSEB >  < OPENZ >  (c=Case() { sw.addChild(c); })+ d=Default() { sw.addChild(d); } < CLOSEZ >  { return sw; } }CaseNode Case():{  CaseNode can = new CaseNode();  Token t=null ;  StringNode sn=null;  StmtNode stn;  ConstNode cn;}{   < CASE > (t=< INT > |sn= String2()) { if(t!=null) { cn=new ConstNode(t.image); can.addChild(cn); } if(sn!=null) can.addChild(sn); }  < D > (stn=Stmt() { can.addChild(stn); })+ < BREAK >< SEMICO >  { return can; }}DefaultNode Default():{  DefaultNode dn =new DefaultNode();  StmtNode stn;}{  < DEF >< D >(stn=Stmt() { dn.addChild(stn); })+  {return dn;}}
